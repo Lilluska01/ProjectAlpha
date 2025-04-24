@@ -1,0 +1,624 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <title>Feladat Generátor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet" />
+  <style>
+      body { margin:0; padding:0; font-family:'Poppins',sans-serif; color:#E0E0E0; background:#1E1E1E; }
+    h1 { font-weight:700; font-size:2.5rem; text-shadow:0 2px 4px rgba(0,0,0,0.6); }
+    .container { max-width:500px; margin:6rem auto 0; text-align:center; position: relative; }
+    .btn-group .btn, .action-btn { font-weight:500; transition:transform .1s,box-shadow .2s; }
+    .btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,0,0,0.5); }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    #task { margin-top:2rem; padding:1rem 1.5rem; background:#1E1E1E; border-radius:.75rem; box-shadow:0 4px 12px rgba(0,0,0,0.5); font-size:1.25rem; font-weight:500; min-height:3rem; display:flex; align-items:center; justify-content:center; }
+    #task.completed { background:#28a745!important; color:#fff!important; }
+    #task.failed    { background:#dc3545!important; color:#fff!important; }
+    .fade-in { animation:fadeIn .5s ease-out; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    #info-msg,#remaining-msg { margin-top:1rem; color:#ffc107; font-weight:500; }
+    #starfield { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; background:#2f2f2f; }
+    #countdown,#lang-switch { position:fixed; background:rgba(32,32,32,0.85); padding:.5rem 1rem; border-radius:.5rem; z-index:1; font-weight:500; }
+    #countdown { top:1rem; left:1rem; }
+    #lang-switch { bottom:1rem; right:1rem; }
+    #lang-switch span { color:#E0E0E0; margin:0 .5rem; cursor:pointer; }
+    #lang-switch .active { text-decoration:underline; }
+    #calendar-controls { display:flex; justify-content:center; align-items:center; margin-top:2rem; }
+    #calendar-controls button { margin:0 .5rem; }
+    #calendar { margin:1rem auto; max-width:500px; background:#1E1E1E; padding:1rem; border-radius:.5rem; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
+    #calendar h2 { text-align:center; color:#E0E0E0; margin-bottom:.5rem; }
+    #calendar table { width:100%; border-collapse:collapse; }
+    #calendar th,#calendar td { width:14.28%; text-align:center; padding:.5rem; border-radius:.25rem; color:#E0E0E0; }
+    #calendar td.empty { background:transparent; }
+    #calendar td.success { background:#28a745; }
+    #calendar td.fail    { background:#dc3545; }
+    #calendar td.today   { border:2px solid #ffc107; }
+    #btn-history {
+      position:fixed;
+      bottom:1rem;
+      left:1rem;
+      background:transparent;
+      border:none;
+      color:#E0E0E0;
+      z-index:1;
+      font-weight:500;
+      transition:opacity .2s;
+    }
+    #btn-history:hover { opacity:0.7; }
+    #history-container { max-width:500px; margin:2rem auto; color:#E0E0E0; }
+    #history-list li { margin-bottom:.5rem; display:flex; align-items:center; justify-content:space-between; background:#2a2a2a; padding:.5rem; border-radius:.25rem; }
+  </style>
+</head>
+<body>
+  <canvas id="starfield"></canvas>
+  <div id="countdown"></div>
+  <div id="lang-switch">
+    <span id="lang-hu">HU</span>│<span id="lang-en">EN</span>
+  </div>
+  <div class="container">
+    <h1 id="title"></h1>
+     <button id="btn-logout"
+          class="btn btn-outline-light"
+          style="
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+          ">
+    Kijelentkezés
+  </button>
+    <div class="btn-group" role="group">
+      <button id="btn-easy"   class="btn btn-success"></button>
+      <button id="btn-normal" class="btn btn-primary"></button>
+      <button id="btn-hard"   class="btn btn-danger"></button>
+    </div>
+    <div id="task"></div>
+    <div class="mt-3">
+      <button id="btn-complete" class="btn btn-outline-light action-btn"></button>
+      <button id="btn-fail"     class="btn btn-outline-light action-btn"></button>
+    </div>
+    <div id="info-msg" style="display:none;"></div>
+    <div id="remaining-msg"></div>
+    <div class="mt-2">
+      <button id="btn-add" class="btn btn-warning"></button>
+      <button id="btn-history" class="btn btn-info ms-2"></button>
+    </div>
+  </div>
+  <div id="calendar-controls">
+    <button id="prev-month" class="btn btn-light">&laquo;</button>
+    <button id="next-month" class="btn btn-light">&raquo;</button>
+  </div>
+  <div id="calendar"></div>
+  <div id="history-container" style="display:none;">
+    <h2 id="history-title"></h2>
+    <ul id="history-list"></ul>
+  </div>
+
+  <script>
+    const tasks = {
+      hu: {
+        easy: [
+          "Menj oda egy idegenhez az utcán, és kérdezd meg tőle az időt",
+          "Ajánld fel, hogy segítesz cipelni egy nehezebb táskát valakinek",
+          "Csinálj 10 szabályos fekvőtámaszt",
+          "Kérj egy bátorítást a barátodtól, hogy mondjon el rád vonatkozó pozitív tulajdonságot",
+          "Adj egy véletlenszerű járókelőnek egy mosolyt és egy “Szia!”-t",
+          "Tarts 5 perces plank pózt (tartott deszka)",
+          "Hívd fel telefonon egy rég nem látott ismerősöd, csak hogy megkérdezd, hogy van",
+          "Írj egy kedves üzenetet egy kollégádnak vagy osztálytársadnak",
+          "Állj meg egy pillanatra naponta háromszor, és vegyél mély lélegzetet",
+          "Csinálj egy rövid, 3 perces nyak- és vállnyújtó gyakorlatot",
+          "Takarítsd ki az íróasztalod felületét",
+          "Mosd el az edényeket",
+          "Locsold meg a virágokat",
+          "Rendezd el a ceruzáidat",
+          "Írj kézzel egy cetlire 5 pozitív mantrát",
+          "Hajolj le, és szedd fel 10 szemetet az utcáról",
+          "Fotózz le 3 érdekes felhőt az égen",
+          "Számolj össze 20 lépést bárhol",
+          "Állj meg és csukd be a szemed egy percre",
+          "Nézz meg egy rövid, vicces videót",
+          "Ülj le 2 percre nyugodtan, és meditálj",
+          "Rajzolj egy szmájlit egy Post-itre",
+          "Készíts 5 kézzel írt jókívánságot másoknak",
+          "Pucold meg az ablaktáblákat egy ablakon",
+          "Gondozd el az otthoni növényeket",
+          "Pucold ki a billentyűzeted közét",
+          "Készíts egy fényképet a reggeli kávédról",
+          "Írj le 3 dolgot, amiért ma hálás vagy",
+          "Állíts be 3 emlékeztetőt a napodra",
+          "Számolj vissza hangosan 10-től 1-ig",
+          "Csinálj 10 csípőemelést",
+          "Masszírozd át két percig a saját válladat",
+          "Mondd el hangosan egy kedvenc idézetedet",
+          "Olvass el 2 perc híreket a telefonodon",
+          "Készíts egy 10 másodperces táncmozdulatot"
+        ],
+        normal: [
+          "Kérj meg valakit az utcán, hogy álljon modellt egy portréfotóhoz (okostelefonnal)",
+          "Tarts 20 szabályos fekvőtámaszt egy menetben",
+          "Menj el egyedül egy ismeretlen kávézóba, és rendeld meg a pincértől a legnépszerűbb kávét",
+          "Kérdezz meg egy idegent, hogy mutassa be a kedvenc helyét a környéken",
+          "Fuss fel és le egy lépcsősoron legalább 5 emeletnyi magasságot",
+          "Állj meg egy forgalmas helyen, és énekelj el hangosan egy dalt (legalább másfél percig)",
+          "Tanulj meg 10 új szót egy idegen nyelvből, majd használd őket egy rövid beszélgetésben",
+          "Csinálj 50 guggolást folyamatosan",
+          "Kérd meg egy barátodat, hogy adjon rád visszajelzést, amíg improvizálsz egy rövid (2–3 perces) beszédet",
+          "Állj meg egy parkban, és tölts el 10 percet teljes csendben, a telefonod nélkül",
+          "Süss egy egyszerű süteményt otthon",
+          "Olvass el egy rövid cikket a kedvenc témádról",
+          "Látogass el egy közeli parkba, és sétálj 15 percet",
+          "Szervezz egy kétszemélyes társasjáték-estét",
+          "Írj egy levelet postán egy barátodnak",
+          "Vegyél részt egy rövid online nyelvórán",
+          "Tanulj meg 5 egyszerű jóga pózt, és próbáld ki őket",
+          "Csinálj egy 10 perces HIIT edzést otthon",
+          "Készíts otthon egy egészséges smoothie-t",
+          "Fotózz le öt szép tárgyat a környezetedben",
+          "Rendezd át a nappali bútorait egy kicsit",
+          "Írj 5 dicséretet magadnak egy naplóba",
+          "Tanulj meg előadni egy rövid viccet barátaidnak",
+          "Csinálj 30 kitörést (lunge) egy menetben",
+          "Írj egy rövid beszámolót a napodról",
+          "Készíts egy egyszerű DIY dekorációt",
+          "Próbálj ki egy új receptet vacsorára",
+          "Kérd meg a szomszédodat egy kis segítségre egy feladatban",
+          "Menj el egyedül egy boltba, és vásárolj be",
+          "Fogj 3 idegent, és kérd el tőlük a kedvenc dalukat",
+          "Szavalj el hangosan egy rövid verset",
+          "Rajzolj 10 másodperc alatt egy portrét magadról",
+          "Fotózz le öt tárgyat színkavalkádról",
+          "Menj el futni 3 kilométert",
+          "Tanulj meg 5 új gyorsbillentyűt a számítógépeden",
+          "Csinálj 20 fekvőtámaszt három etapban",
+          "Szervezz egy improvizációs játékot barátokkal",
+          "Készíts egy 2 perces humoros tánclépést videóra",
+          "Állíts be napi 10 perc selfie-time-ot magadnak"
+        ],
+        hard: [
+          "Ugrálj át két, legfeljebb 1,5 méterre lévő tető között (biztonságos, megközelíthető helyen)",
+          "Csinálj 100 fekvőtámaszt több etapban",
+          "Beszélj le egy teljesen idegent arról, hogy ma este csatlakozzon hozzád egy bulira vagy közös programra",
+          "Tarts 5 perces planket, miközben idegenek figyelnek",
+          "Énekelj el egy dalt a metrón vagy villamoson, teli hangszóróval",
+          "Fuss el egy félmaratont (21,1 km) anélkül, hogy előtte különös felkészülést tartanál",
+          "Kérj meg egy járókelőt, hogy mutassa be az albérletét egy gyors körre – csak ha biztonságban érzed magad!",
+          "Kérd fel egy idegent, hogy tarts veled improvizációs jelenetet a nyilvánosság előtt (pl. parkban)",
+          "Csinálj 200 guggolást és 100 felhúzódzkodást egy napon belül",
+          "Állj fel egy forgalmas tér közepén, és tarts egy spontán, 3 perces motivációs beszédet ismeretlen hallgatóságnak",
+          "Állj mozdulatlanul 10 percig, csak a légzésedre figyelve",
+          "Tarts 10 perces éneklő szólókoncertet otthon",
+          "Próbálj ki falmászást egy mászóteremben",
+          "Fesse le az utca falát krétával",
+          "Menj el egyedül egy ismeretlen városba vonattal—napközben",
+          "Építs egy miniatűr csónakot szívószálból",
+          "Gyűjts össze 50 különböző kavicsot a kövezeten",
+          "Csinálj egy 30 km-es kerékpártúrát előkészület nélkül",
+          "Szavalj el öt operarészletet idegeneknek a tömegközlekedésen",
+          "Építs gallyakból egy mini menedéket a kertben",
+          "Tarts 10 perces fejjel lefelé planket a fal mellett",
+          "Énekelj duettet idegennel a buszon",
+          "Csinálj 500 guggolást",
+          "Taníts meg 5 idegent a kedvenc tánclépésedre",
+          "Kaszálj füvet kézifűrésszel",
+          "Indíts pop-up utcai koncertet hangszórók nélkül",
+          "Mászz fel egy fára legalább 7 méter magasra",
+          "Énekelj himnuszt egy belvárosi téren",
+          "Tarts pop-up standup előadást 10 ismeretlennek",
+          "Csinálj 1000 fekvőtámaszt",
+          "Próbálj ki bungee jumpingot",
+          "Teljesíts egy 50 km-es ultramaratont",
+          "Indíts egy napközbeni 1 órás utcai flashmobot",
+          "Szervezz egy improvizált közterületi workshopot idegeneknek"
+        ]
+      },
+      en: {
+        easy: [
+          "Go up to a stranger on the street and ask them for the time",
+          "Offer to help someone carry a heavy bag",
+          "Do 10 perfect push‑ups",
+          "Ask a friend for encouragement by having them tell you a positive trait about yourself",
+          "Give a random passerby a smile and a “Hi!”",
+          "Hold a plank position for 5 minutes",
+          "Call someone you haven’t talked to in a long time just to ask how they are",
+          "Write a kind message to a colleague or classmate",
+          "Stop for a moment three times a day and take a deep breath",
+          "Perform a short, 3‑minute neck and shoulder stretch",
+          "Clear off the surface of your desk",
+          "Wash the dishes",
+          "Water the plants",
+          "Organize your pencils",
+          "Handwrite 5 positive mantras on a note",
+          "Bend down and pick up 10 pieces of litter from the street",
+          "Photograph 3 interesting clouds in the sky",
+          "Count 20 steps anywhere",
+          "Stop and close your eyes for one minute",
+          "Watch a short, funny video",
+          "Sit quietly for 2 minutes and meditate",
+          "Draw a smiley on a Post-it note",
+          "Write 5 handwritten well‑wishes for others",
+          "Clean the window panes on a window",
+          "Tend to your houseplants",
+          "Clean between the keys on your keyboard",
+          "Take a photo of your morning coffee",
+          "Write down 3 things you are grateful for today",
+          "Set 3 reminders for your day",
+          "Count down out loud from 10 to 1",
+          "Do 10 glute bridges",
+          "Massage your own shoulders for two minutes",
+          "Say one of your favorite quotes out loud",
+          "Read 2 minutes of news on your phone",
+          "Create a 10-second dance move"
+        ],
+        normal: [
+          "Ask someone on the street to model for a portrait photo (with a smartphone)",
+          "Do 20 perfect push‑ups in one go",
+          "Go alone to an unfamiliar café and order the most popular coffee from the barista",
+          "Ask a stranger to show you their favorite place in the neighborhood",
+          "Run up and down a staircase totaling at least 5 floors",
+          "Stop in a busy place and sing a song out loud for at least 1.5 minutes",
+          "Learn 10 new words in a foreign language and use them in a short conversation",
+          "Do 50 squats continuously",
+          "Ask a friend to give you feedback while you improvise a short (2–3 minute) speech",
+          "Go to a park and spend 10 minutes in complete silence, without your phone",
+          "Bake a simple cake at home",
+          "Read a short article on your favorite topic",
+          "Visit a nearby park and walk for 15 minutes",
+          "Organize a two-person board game evening",
+          "Write a letter by mail to a friend",
+          "Take a short online language lesson",
+          "Learn 5 simple yoga poses and try them",
+          "Do a 10-minute HIIT workout at home",
+          "Make a healthy smoothie at home",
+          "Photograph five beautiful objects in your environment",
+          "Rearrange the furniture in your living room a bit",
+          "Write 5 compliments to yourself in a journal",
+          "Learn to perform a short joke for your friends",
+          "Do 30 lunges in one set",
+          "Write a short report about your day",
+          "Make a simple DIY decoration",
+          "Try a new recipe for dinner",
+          "Ask your neighbor for a bit of help with a task",
+          "Go shopping alone in a store",
+          "Approach 3 strangers and ask for their favorite song",
+          "Recite a short poem out loud",
+          "Draw a self‑portrait in 10 seconds",
+          "Photograph five items with a color theme",
+          "Go for a 3 km run",
+          "Learn 5 new keyboard shortcuts on your computer",
+          "Do 20 push‑ups in three sets",
+          "Organize an improv game with friends",
+          "Make a 2‑minute funny dance video",
+          "Schedule 10 minutes of selfie time for yourself each day"
+        ],
+        hard: [
+          "Leap across two roofs up to 1.5 meters apart (in a safe, accessible location)",
+          "Do 100 push‑ups in multiple sets",
+          "Convince a complete stranger to join you for a party or activity tonight",
+          "Hold a 5‑minute plank while strangers watch you",
+          "Sing a song on the subway or tram with full volume",
+          "Run a half marathon (21.1 km) without special training beforehand",
+          "Ask a passerby to show you their apartment for a quick tour—only if you feel safe",
+          "Ask a stranger to perform an improvisation scene with you in public (e.g., in a park)",
+          "Do 200 squats and 100 pull‑ups within one day",
+          "Stand in the middle of a busy square and give a spontaneous 3‑minute motivational speech to strangers",
+          "Stand still for 10 minutes focusing only on your breathing",
+          "Give a 10‑minute solo singing concert at home",
+          "Try rock climbing at a climbing gym",
+          "Draw on a wall in public with chalk",
+          "Go alone to an unfamiliar city by train—during the day",
+          "Build a miniature straw boat",
+          "Collect 50 different pebbles on the pavement",
+          "Go on a 30 km bike ride without preparation",
+          "Recite five opera excerpts to strangers on public transport",
+          "Build a mini shelter from branches in the garden",
+          "Do a 10‑minute inverted plank against a wall",
+          "Sing a duet with a stranger on the bus",
+          "Do 500 squats",
+          "Teach 5 strangers your favorite dance move",
+          "Mow grass with a hand saw",
+          "Start a pop‑up street concert without speakers",
+          "Climb a tree at least 7 meters high",
+          "Sing a national anthem in a downtown square",
+          "Perform a pop‑up standup show for 10 strangers",
+          "Do 1000 push‑ups",
+          "Try bungee jumping",
+          "Complete a 50 km ultramarathon",
+          "Organize a one‑hour daytime flash mob",
+          "Host an impromptu public workshop for strangers"
+        ]
+      }
+    };
+    const dict = {
+      hu: {
+        title: "🎯 Feladat Generátor", easy: "Könnyű", normal: "Normál", hard: "Nehéz",
+        initial: "Kattints a gombra egy új feladathoz!", complete: "Kész", fail: "Nem tudtam elvégezni",
+        remaining: n => `Hátralévő próbálkozások száma: ${n}`,
+        prompt:    n => `Generálj egy új feladatot (Megmaradt próbálkozások száma: ${n})`,
+        countdownLabel: (h,m,s) => `Az újrapróbálkozások visszatöltésének ideje: ${h}:${m}:${s}`,
+        weekdays: ["H","K","Sze","Cs","P","Sz","V"], add: "+1 próbálkozás",
+        history: "Előzmények"
+      },
+      en: {
+        title: "🎯 Task Generator", easy: "Easy", normal: "Normal", hard: "Hard",
+        initial: "Click a button for a new task!", complete: "Complete", fail: "I couldn't complete it",
+        remaining: n => `Remaining tries: ${n}`,
+        prompt:    n => `Generate a new task (Tries left: ${n})`,
+        countdownLabel: (h,m,s) => `Time until retries reset: ${h}:${m}:${s}`,
+        weekdays: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], add: "+1 try",
+        history: "History"
+      }
+    };
+
+    const el = id => document.getElementById(id),
+          titleEl = el("title"), btnEasy = el("btn-easy"), btnNorm = el("btn-normal"), btnHard = el("btn-hard"),
+          taskEl = el("task"), btnComp = el("btn-complete"), btnFail = el("btn-fail"), btnAdd = el("btn-add"),
+          btnHistory = el("btn-history"), infoMsg = el("info-msg"), remMsg = el("remaining-msg"),
+          cdEl = el("countdown"), calEl = el("calendar"),
+          langHu = el("lang-hu"), langEn = el("lang-en"), prevBtn = el("prev-month"), nextBtn = el("next-month"),
+          historyContainer = el("history-container"), historyTitle = el("history-title"), historyList = el("history-list");
+
+    let lang = localStorage.getItem("lang") || "hu";
+
+    function applyLang() {
+      const d = dict[lang];
+      langHu.classList.toggle("active", lang==="hu"); langEn.classList.toggle("active", lang==="en");
+      titleEl.innerText = d.title;
+      btnEasy.innerText = d.easy; btnNorm.innerText = d.normal; btnHard.innerText = d.hard;
+      btnComp.innerText = d.complete; btnFail.innerText = d.fail; btnAdd.innerText = d.add; btnHistory.innerText = d.history;
+      historyTitle.innerText = d.history;
+      if (!taskEl.innerText) taskEl.innerText = d.initial;
+      updateRemaining(); renderCalendar(viewYear, viewMonth);
+    }
+    langHu.onclick = () => { lang="hu"; localStorage.setItem("lang","hu"); applyLang(); };
+    langEn.onclick = () => { lang="en"; localStorage.setItem("lang","en"); applyLang(); };
+
+    const canvas = el("starfield"), ctx = canvas.getContext("2d");
+    let W,H;
+    function resize(){ W=canvas.width=innerWidth; H=canvas.height=innerHeight; }
+    window.addEventListener("resize", resize); resize();
+    class Star {
+      constructor(){ this.reset(); }
+      reset(){
+        this.x = Math.random()*W;
+        this.y = Math.random()*H;
+        this.size = Math.random()*1.2+0.2;
+        this.speed = Math.random()*0.5+0.1;
+        this.opacity = Math.random()*0.5+0.3;
+      }
+      update(){
+        this.y += this.speed;
+        if(this.y>H) this.reset();
+      }
+      draw(){
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.size,0,2*Math.PI);
+        ctx.fillStyle = `rgba(255,255,255,${this.opacity})`;
+        ctx.fill();
+      }
+    }
+    const stars = Array.from({length:150},()=>new Star());
+    (function anim(){
+      ctx.clearRect(0,0,W,H);
+      stars.forEach(s=>{s.update();s.draw()});
+      requestAnimationFrame(anim);
+    })();
+
+    const MAX = 3;
+    let state = JSON.parse(localStorage.getItem("taskGenState")||"{}");
+    function todayStr(){ return new Date().toISOString().slice(0,10); }
+    if(state.lastReset !== todayStr()){
+      state.count = 0;
+      state.lastReset = todayStr();
+      state.history = state.history||{};
+      localStorage.setItem("taskGenState", JSON.stringify(state));
+    }
+
+    function updateCountdown(){
+      const now = new Date(),
+            next = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
+      if(now>next) next.setTime(next.getTime()+86400000);
+      const diff = next - now,
+            h = String(Math.floor(diff/3600000)).padStart(2,"0"),
+            m = String(Math.floor((diff%3600000)/60000)).padStart(2,"0"),
+            s = String(Math.floor((diff%60000)/1000)).padStart(2,"0");
+      cdEl.innerText = dict[lang].countdownLabel(h,m,s);
+      if(diff<=0){
+        state.count = 0;
+        state.lastReset = todayStr();
+        localStorage.setItem("taskGenState", JSON.stringify(state));
+        updateRemaining();
+      }
+    }
+    setInterval(updateCountdown,1000);
+    updateCountdown();
+
+    [btnComp, btnFail].forEach(b=>b.disabled=true);
+
+    function updateRemaining(){
+      const r = MAX - state.count;
+      remMsg.innerText = dict[lang].remaining(r);
+      remMsg.style.display = "block";
+    }
+
+    function disableAll(){
+      [btnEasy,btnNorm,btnHard,btnComp,btnFail].forEach(b=>b.disabled=true);
+    }
+
+    function makeTask(level){
+      if(state.count>=MAX) return;
+      taskEl.classList.remove("completed","failed");
+      infoMsg.style.display="none";
+
+      const arr = tasks[lang][level];
+      const t = arr[Math.floor(Math.random()*arr.length)];
+      taskEl.innerText = t;
+      taskEl.classList.add("fade-in");
+      setTimeout(()=>taskEl.classList.remove("fade-in"),500);
+
+      btnComp.disabled = btnFail.disabled = false;
+      state.count++;
+      localStorage.setItem("taskGenState", JSON.stringify(state));
+      updateRemaining();
+
+      if(state.count>=MAX){
+        btnEasy.disabled = btnNorm.disabled = btnHard.disabled = true;
+      }
+    }
+
+    btnEasy.onclick = ()=>makeTask("easy");
+    btnNorm.onclick = ()=>makeTask("normal");
+    btnHard.onclick = ()=>makeTask("hard");
+    btnComp.onclick = ()=> {
+
+  const t = taskEl.innerText;
+  taskEl.classList.add("completed");
+  taskEl.classList.remove("failed");
+  infoMsg.style.display="none";
+  remMsg.style.display="none";
+  state.count = MAX;
+  localStorage.setItem("taskGenState", JSON.stringify(state));
+  updateRemaining();
+  disableAll();
+  const d = todayStr();
+  state.history[d] = "success";
+  localStorage.setItem("taskGenState", JSON.stringify(state));
+  renderCalendar(viewYear, viewMonth);
+  fetch('/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: t, status: 'success' })
+  })
+  .then(res => res.json())
+  .then(_ => {
+    if (historyContainer.style.display === 'block') loadHistory();
+  })
+  .catch(err => console.error('POST history hiba:', err));
+};
+
+btnFail.onclick = ()=> {
+  const t = taskEl.innerText;
+  taskEl.classList.add("failed");
+  taskEl.classList.remove("completed");
+  const r = MAX - state.count;
+  if(r>0){
+    infoMsg.innerText = dict[lang].prompt(r);
+    infoMsg.style.display = "block";
+  } else {
+    disableAll();
+    infoMsg.style.display = "none";
+  }
+  remMsg.style.display="none";
+  const d = todayStr();
+  state.history[d] = "fail";
+  localStorage.setItem("taskGenState", JSON.stringify(state));
+  renderCalendar(viewYear, viewMonth);
+  fetch('/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: t, status: 'fail' })
+  })
+  .then(res => res.json())
+  .then(_ => {
+    if (historyContainer.style.display === 'block') loadHistory();
+  })
+  .catch(err => console.error('POST history hiba:', err));
+};
+
+    btnAdd.onclick = ()=>{
+      if(state.count>0){
+        state.count--;
+        localStorage.setItem("taskGenState", JSON.stringify(state));
+        updateRemaining();
+        btnEasy.disabled = btnNorm.disabled = btnHard.disabled = false;
+      }
+    };
+
+    updateRemaining();
+
+    let viewDate = new Date(),
+        viewYear = viewDate.getFullYear(),
+        viewMonth = viewDate.getMonth();
+
+    prevBtn.onclick = ()=>{
+      viewMonth--;
+      if(viewMonth<0){ viewMonth=11; viewYear--; }
+      renderCalendar(viewYear, viewMonth);
+    };
+    nextBtn.onclick = ()=>{
+      viewMonth++;
+      if(viewMonth>11){ viewMonth=0; viewYear++; }
+      renderCalendar(viewYear, viewMonth);
+    };
+
+    function renderCalendar(year,month){
+      const first = new Date(year,month,1),
+            last  = new Date(year,month+1,0);
+      let html = `<h2>${year} – ${month+1}</h2><table><tr>`;
+      dict[lang].weekdays.forEach(wd=> html+=`<th>${wd}</th>`);
+      html+=`</tr><tr>`;
+      for(let i=0;i<first.getDay();i++) html+=`<td class="empty"></td>`;
+      for(let d=1; d<=last.getDate(); d++){
+        const key = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`,
+              cls = state.history[key]==="success"?"success":state.history[key]==="fail"?"fail":"",
+              todayCls = (year===new Date().getFullYear() && month===new Date().getMonth() && d===new Date().getDate())?" today ":"";
+        html+=`<td class="${cls}${todayCls}">${d}</td>`;
+        if((first.getDay()+d)%7===0) html+=`</tr><tr>`;
+      }
+      html+=`</tr></table>`;
+      calEl.innerHTML = html;
+    }
+    
+    btnHistory.onclick = () => {
+      if (historyContainer.style.display === 'none') {
+        loadHistory(); historyContainer.style.display = 'block';
+      } else {
+        historyContainer.style.display = 'none';
+      }
+    };
+
+    function loadHistory() {
+  fetch('/history')
+    .then(res => res.json())
+    .then(data => {
+      historyList.innerHTML = '';
+      data.forEach(item => {
+        const li = document.createElement('li');
+        const date = new Date(item.date);
+        const span = document.createElement('span');
+        span.textContent = `${date.toLocaleString(lang)} – ${item.task} [${item.status}]`;
+
+        const del = document.createElement('button');
+        del.className = 'btn btn-sm btn-danger';
+        del.textContent = lang === 'hu' ? 'Törlés' : 'Delete';
+        del.onclick = () => {
+          fetch(`/history/${item.id}`, { method: 'DELETE' })
+            .then(res => {
+              if (res.status === 204) {
+                li.remove();
+              } else {
+                alert('Delete failed');
+              }
+            });
+        };
+
+        li.appendChild(span);
+        li.appendChild(del);
+        historyList.appendChild(li);
+      });
+    })
+    .catch(err => console.error('History load error:', err));
+    }
+
+    const btnLogout = document.getElementById("btn-logout");
+    btnLogout.onclick = () => {
+      // egyszerűen átirányít a /logout végpontra
+      window.location.href = "/logout";
+    };
+
+    renderCalendar(viewYear, viewMonth);
+    applyLang();
+  </script>
+</body>
+</html>
