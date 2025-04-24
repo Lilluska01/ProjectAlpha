@@ -41,7 +41,7 @@ Open on this link: https://taskgenerator-eubcd6hud6dghgek.germanywestcentral-01.
 
 ## Usage
 
-- **Register**,**Login** and **Logout**
+- **Register**/**Login**
 - **Generate a new task**: Click **Easy**, **Normal**, or **Hard**
 - **Mark complete**: Click **Complete** to turn the task box green
 - **Mark fail**: Click **I couldn't complete it** to turn it red and prompt further attempts
