@@ -14,6 +14,7 @@ This project is an interactive task generator offering three daily challenges—
 - **Starfield background** and **animated UI** for a modern look
 - **Multilingual support**: English and Hungarian interfaces
 - **Responsive design** powered by Bootstrap 5
+- **Login** and **Register** page 
 
 ---
 
