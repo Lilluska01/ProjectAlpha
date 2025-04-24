@@ -34,7 +34,7 @@ This project is an interactive task generator offering three daily challenges—
 
 OR
 
-Open on this link: https://taskgenerator1.z1.web.core.windows.net
+Open on this link: https://taskgenerator-eubcd6hud6dghgek.germanywestcentral-01.azurewebsites.net/index.html
 
 
 ---
